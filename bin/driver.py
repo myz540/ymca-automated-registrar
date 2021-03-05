@@ -2,9 +2,7 @@
 
 import datetime
 import sched
-from collections import namedtuple
 from configparser import ConfigParser
-from sys import argv
 from time import sleep, time
 import argparse
 
@@ -12,64 +10,30 @@ import pyautogui
 import pytz
 from selenium import webdriver
 
-from ymca_automated_registrar import time_slot
+from ymca_automated_registrar import core
 
 
-def register():
+def register(url: str, event: str, timeslot: core.TimeSlot, explore: bool):
 
-    conf = ConfigParser()
-    conf.read("./.config")
-    url = conf["DEFAULT"]["url"]
     print(url)
+    # instantiate driver and go the landing page
     driver = webdriver.Chrome()
     driver.get(url)
     driver.maximize_window()
 
-    print(pyautogui.size())
-    print(pyautogui.position())
+    # if exploring, keep printing out mouse position
+    while explore:
+        print(pyautogui.position())
 
-    Point = namedtuple("Point", ["x", "y"])
+    # navigate to the event
+    core.navigate_to_event(event=event, driver=driver, delay=3)
 
-    class TimeSlot:
-        def __init__(self, x, y):
-            self.slot = Point(x, y)
-            self.register_slot = Point(x + 75, y + 95)
+    # if the timeslot is on a sunday or monday, registration will be on the next page
+    if timeslot.weekday() in [6, 0]:
+        core.navigate_to_next_page()
 
-    if len(argv) != 2:
-        exit(1, "Not enough args")
-
-    if argv[1] == "swim":
-        elem = driver.find_element_by_id("btnPersonalTraining")
-        elem.click()
-        sleep(3)
-        elem2 = driver.find_element_by_id("phNetworkScheduleControl1_btnDepartment3")
-        elem2.click()
-        sleep(3)
-        print(dir(driver))
-    elif argv[1] == "ball":
-        elem = driver.find_element_by_id("btnRacquetSportsBookCourt")
-        elem.click()
-        sleep(3)
-        elem2 = driver.find_element_by_id("phNetworkScheduleControl1_btnDepartment2")
-        elem2.click()
-        sleep(3)
-    else:
-        exit(1, "Unsupported mode")
-
-    next_page = True
-    if next_page:
-        pyautogui.moveTo(1393, 347)
-        pyautogui.click()
-        sleep(2)
-
-    # slot = TimeSlot(1625, 735)
-    slot = TimeSlot(875, 916)
-    sleep(2)
-    pyautogui.moveTo(*slot.slot)
-    pyautogui.click()
-    sleep(2)
-    pyautogui.moveTo(*slot.register_slot)
-    pyautogui.click()
+    core.move_and_click(timeslot.slot)
+    core.move_and_click(timeslot.register_slot)
 
     explore = False
     while explore:
@@ -83,35 +47,66 @@ def register():
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('-e', '--event', required=True, choices=['swim', 'ball'], help='event to register for')
-    parser.add_argument('-s', '--slot-pos', nargs=2, type=float, help='mouse position (x, y) of the time slot')
-    parser.add_argument('-t', '--time', help='datetime string for the time slot to register')
-    parser.add_argument('--explore', action='store_true', help='use this mode to identify slot pos')
-    parser.add_argument('--dry-run', action='store_true', help='use this mode to dry-run the scripted registration')
+    parser.add_argument(
+        "-e", "--event", choices=["swim", "ball"], help="event to register for"
+    )
+    parser.add_argument(
+        "-s",
+        "--slot-pos",
+        nargs=2,
+        type=float,
+        help="mouse position (x, y) of the time slot",
+    )
+    parser.add_argument(
+        "-t", "--time", help="datetime string for the time slot to register"
+    )
+    parser.add_argument(
+        "--explore", action="store_true", help="use this mode to identify slot pos"
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="use this mode to dry-run the scripted registration",
+    )
+    parser.add_argument("--debug", action="store_true")
+    parser.add_argument("--verbose", action="store_true")
 
     args = parser.parse_args()
 
     print(args)
 
+    # get the event from the registry of supported events
+    event = core.event_registry.get(args.event)
 
+    # read conf file to get URL
+    conf = ConfigParser()
+    conf.read("./.config")
+    url = conf["DEFAULT"]["url"]
 
-    est = pytz.timezone("US/Eastern")
-    dt = datetime.datetime(2021, 3, 5, 13, 59, 52)
+    # assume EST
+    tz = pytz.timezone("US/Eastern")
+    # try to parse the provided date time string
+    dt = datetime.datetime.strptime(args.time, "%Y-%m-%d %H:%M:%S")
+
+    # make timeslot from pos
+    timeslot = core.TimeSlot(x=args.slot_pos[0], y=args.slot_pos[1], dt=dt)
+
+    print(dt)
+    aware_dt = tz.localize(dt)
 
     exit(0)
 
-    aware = est.localize(dt)
-
-    print(dt)
-    print(aware)
-    print(dt.timestamp())
-    print(aware.timestamp())
     s = sched.scheduler(time, sleep)
-    delay = aware.timestamp() - time()
-    dry_run = True
-    if dry_run:
-        delay = 2
-
-    s.enter(delay, 1, register)
+    delay = 2 if args.dry_run else aware_dt.timestamp() - time()
+    s.enter(
+        delay,
+        1,
+        register,
+        kwargs={
+            "url": url,
+            "event": event,
+            "timeslot": timeslot,
+            "explore": args.explore,
+        },
+    )
     s.run()
-    register()

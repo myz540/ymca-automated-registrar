@@ -1,13 +1,18 @@
+#!/usr/bin/env python
+
 import datetime
 import sched
 from collections import namedtuple
 from configparser import ConfigParser
 from sys import argv
 from time import sleep, time
+import argparse
 
 import pyautogui
 import pytz
 from selenium import webdriver
+
+from ymca_automated_registrar import time_slot
 
 
 def register():
@@ -76,8 +81,24 @@ def register():
 
 
 if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-e', '--event', required=True, choices=['swim', 'ball'], help='event to register for')
+    parser.add_argument('-s', '--slot-pos', nargs=2, type=float, help='mouse position (x, y) of the time slot')
+    parser.add_argument('-t', '--time', help='datetime string for the time slot to register')
+    parser.add_argument('--explore', action='store_true', help='use this mode to identify slot pos')
+    parser.add_argument('--dry-run', action='store_true', help='use this mode to dry-run the scripted registration')
+
+    args = parser.parse_args()
+
+    print(args)
+
+
+
     est = pytz.timezone("US/Eastern")
     dt = datetime.datetime(2021, 3, 5, 13, 59, 52)
+
+    exit(0)
 
     aware = est.localize(dt)
 

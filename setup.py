@@ -16,8 +16,7 @@ setup(
     zip_safe=False,
     install_requires=[
         "selenium==3.141.0",
-        "pytz==2020.4"
-        "pyautogui==0.9.52"
-
+        "pytz==2020.4",
+        "pyautogui==0.9.52",
     ],
 )

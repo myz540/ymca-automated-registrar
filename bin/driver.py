@@ -1,25 +1,35 @@
 #!/usr/bin/env python
 
+import argparse
 import datetime
 import sched
 from configparser import ConfigParser
+from pathlib import Path
 from time import sleep, time
-import argparse
 
 import pyautogui
 import pytz
 from selenium import webdriver
-
 from ymca_automated_registrar import core
 
 
-def register(url: str, event: core.Event, timeslot: core.TimeSlot, explore: bool):
+def register(
+    event: core.Event, timeslot: core.TimeSlot, explore: bool, conf: ConfigParser
+):
 
-    print(url)
+    print(type(conf))
+    url = conf["DEFAULT"]["url"]
+    user = conf["DEFAULT"]["user"]
+    password = conf["DEFAULT"]["password"]
+
+    print(url, user, '*'*len(password))
     # instantiate driver and go the landing page
     driver = webdriver.Chrome()
     driver.get(url)
     driver.maximize_window()
+
+    print("Logging in")
+    core.login(user=user, password=password, driver=driver, delay=2)
 
     # navigate to the event
     print("Navigating to event")
@@ -81,7 +91,8 @@ if __name__ == "__main__":
 
     # read conf file to get URL
     conf = ConfigParser()
-    conf.read("./.config")
+    conf_file = Path(__file__).parents[1] / ".config"
+    conf.read(conf_file)
     url = conf["DEFAULT"]["url"]
 
     # assume EST
@@ -108,10 +119,10 @@ if __name__ == "__main__":
         1,
         register,
         kwargs={
-            "url": url,
             "event": event,
             "timeslot": timeslot,
             "explore": args.explore,
+            "conf": conf,
         },
     )
     s.run()

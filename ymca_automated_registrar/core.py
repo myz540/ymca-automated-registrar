@@ -67,3 +67,19 @@ def move_and_click(point: Point, delay: int = 0):
     pyautogui.moveTo(point)
     pyautogui.click()
     sleep(delay)
+
+
+def login(
+    user: str,
+    password: str,
+    driver: webdriver.chrome.webdriver.WebDriver,
+    delay: int = 0,
+):
+
+    elem = driver.find_element_by_id("txtLogin")
+    elem.send_keys(user)
+    elem2 = driver.find_element_by_id("txtPassword")
+    elem2.send_keys(password)
+    btn = driver.find_element_by_id("divLoginButton")
+    btn.click()
+    sleep(delay)

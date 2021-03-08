@@ -4,6 +4,7 @@ from typing import NamedTuple, Optional
 from time import sleep
 import pyautogui
 
+
 class Event(NamedTuple):
     event: str
     main_event_link: str
@@ -39,7 +40,7 @@ class TimeSlot:
         self.slot = Point(x, y)
         self.register_slot = Point(x + 75, y + 95)
         self.dt = dt
-        self.weekday = dt.weekday()
+        self.weekday = (dt.weekday() + 2) % 7
 
 
 def navigate_to_event(
@@ -47,9 +48,6 @@ def navigate_to_event(
     driver: webdriver.chrome.webdriver.WebDriver,
     delay: int = 0,
 ) -> None:
-
-    if not delay:
-        delay = 0
 
     elem = driver.find_element_by_id(event.main_event_link)
     elem.click()
@@ -69,4 +67,3 @@ def move_and_click(point: Point, delay: int = 0):
     pyautogui.moveTo(point)
     pyautogui.click()
     sleep(delay)
-

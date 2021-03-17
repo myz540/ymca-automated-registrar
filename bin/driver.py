@@ -13,43 +13,69 @@ from selenium import webdriver
 from ymca_automated_registrar import core
 
 
-def register(
-    event: core.Event, timeslot: core.TimeSlot, explore: bool, conf: ConfigParser
+def prepare_registration(
+    event: core.Event,
+    timeslot: core.TimeSlot,
+    conf: ConfigParser,
+    driver: webdriver.chrome.webdriver.WebDriver,
 ):
-
-    print(type(conf))
     url = conf["DEFAULT"]["url"]
     user = conf["DEFAULT"]["user"]
     password = conf["DEFAULT"]["password"]
 
-    print(url, user, '*'*len(password))
-    # instantiate driver and go the landing page
-    driver = webdriver.Chrome()
+    # get URL, max windowo, and go the landing page
     driver.get(url)
     driver.maximize_window()
 
-    print("Logging in")
+    print("Logging in...")
+    print(url, user, "*" * len(password))
     core.login(user=user, password=password, driver=driver, delay=2)
 
     # navigate to the event
-    print("Navigating to event")
-    core.navigate_to_event(event=event, driver=driver, delay=3)
+    print("Navigating to main event...")
+    core.navigate_to_event(event=event.main_event_link, driver=driver, delay=3)
 
     # if the timeslot is on a sunday or monday, registration will be on the next page
     if timeslot.weekday in [6, 0]:
+        print("Next page...")
         core.navigate_to_next_page()
 
+
+def register(
+    event: core.Event,
+    timeslot: core.TimeSlot,
+    explore: bool,
+    driver: webdriver.chrome.webdriver.WebDriver,
+    scroll: bool,
+):
+    print("Navigating to sub-event...")
+    core.navigate_to_event(event=event.sub_event_link, driver=driver, delay=3)
+
+    if scroll:
+        print("Scrolling to bottom...")
+        core.scroll_to_bottom()
+
+    print("Registering for time slot...")
     core.move_and_click(point=timeslot.slot, delay=1)
     core.move_and_click(point=timeslot.register_slot, delay=1)
 
     # if exploring, keep printing out mouse position
     while explore:
-        print(pyautogui.position())
-        sleep(1)
+        try:
+            print(pyautogui.position())
+            sleep(1)
+        except KeyboardInterrupt:
+            break
 
     sleep(5)
     driver.close()
+    driver.quit()
     exit(0)
+
+
+def custom_wait(x):
+    print(f"Waiting...{x:.2f}")
+    sleep(x)
 
 
 if __name__ == "__main__":
@@ -75,6 +101,11 @@ if __name__ == "__main__":
         "--explore", action="store_true", help="use this mode to identify slot pos"
     )
     parser.add_argument(
+        "--scroll",
+        action="store_true",
+        help="sometimes the timeslot is at the bottom of the page and you need to scroll to register",
+    )
+    parser.add_argument(
         "--dryrun",
         action="store_true",
         help="use this mode to dry-run the scripted registration",
@@ -85,6 +116,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     print(args)
+
+    # instantiate driver to pass around
+    driver = webdriver.Chrome()
 
     # get the event from the registry of supported events
     event = core.event_registry.get(args.event)
@@ -112,17 +146,32 @@ if __name__ == "__main__":
     print(dt)
     aware_dt = tz.localize(dt)
 
-    s = sched.scheduler(time, sleep)
-    delay = 2 if args.dryrun else aware_dt.timestamp() - time()
+    s = sched.scheduler(time, custom_wait)
+    if args.dryrun:
+        # delay between launch and prepare()
+        init_delay = 5
+        # delay between launch and register()
+        registration_delay = 20
+    else:
+        init_delay = aware_dt.timestamp() - time() - 20
+        registration_delay = aware_dt.timestamp() - time()
+
     s.enter(
-        delay,
+        init_delay,
         1,
+        prepare_registration,
+        kwargs={"event": event, "timeslot": timeslot, "conf": conf, "driver": driver},
+    )
+    s.enter(
+        registration_delay,
+        2,
         register,
         kwargs={
             "event": event,
             "timeslot": timeslot,
             "explore": args.explore,
-            "conf": conf,
+            "driver": driver,
+            "scroll": args.scroll
         },
     )
     s.run()

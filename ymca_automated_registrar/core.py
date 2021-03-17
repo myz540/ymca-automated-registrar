@@ -44,16 +44,13 @@ class TimeSlot:
 
 
 def navigate_to_event(
-    event: Event,
+    event: str,
     driver: webdriver.chrome.webdriver.WebDriver,
     delay: int = 0,
 ) -> None:
 
-    elem = driver.find_element_by_id(event.main_event_link)
+    elem = driver.find_element_by_id(event)
     elem.click()
-    sleep(delay)
-    elem2 = driver.find_element_by_id(event.sub_event_link)
-    elem2.click()
     sleep(delay)
 
 
@@ -82,4 +79,10 @@ def login(
     elem2.send_keys(password)
     btn = driver.find_element_by_id("divLoginButton")
     btn.click()
+    sleep(delay)
+
+
+def scroll_to_bottom(delay: int = 0):
+    pyautogui.moveTo(200, 200)
+    pyautogui.scroll(-10)
     sleep(delay)
